@@ -587,5 +587,68 @@ namespace NStateManager.Tests
             Assert.Equal(SaleState.Complete, sale.State);
             Assert.Equal(sale.Balance, testRequest.Value);
         }
+
+        [Fact]
+        public async Task FireTriggerAsyncWRequest_addTransitionSignatureWRequest_transitionExecutesWithRequestInstance()
+        {
+            var testRequest = new TestRequest(123.45);
+
+            var sut = new StateMachineAsync<Sale, SaleState, SaleEvent>(
+                stateAccessor: sale2 => sale2.State
+                , stateMutator: (sale3, newState) => sale3.State = newState);
+
+            var result = default(double);
+
+            sut.ConfigureState(SaleState.Open)
+                .AddTransition<TestRequest>(SaleEvent.Pay, SaleState.Complete, (saleInstance, request, token) =>
+                {
+                    result = request.Value;
+                    return Task.FromResult(true);
+                });
+
+            var sale = new Sale(saleID: 45) { State = SaleState.Open };
+            var stateTransitionResult = await sut.FireTriggerAsync<TestRequest>(sale, SaleEvent.Pay, testRequest);
+
+            Assert.NotNull(stateTransitionResult);
+            Assert.Equal(SaleState.Complete, stateTransitionResult.CurrentState);
+            Assert.Equal(SaleState.Complete, sale.State);
+            Assert.Equal(result, testRequest.Value);
+        }
+
+        [Fact]
+        public async Task FireTriggerAsyncWRequest_addConsecutiveTransitionSignaturesWRequest_transitionExecutesWithRequestInstance()
+        {
+            var sut = new StateMachineAsync<Sale, SaleState, SaleEvent>(
+                stateAccessor: sale2 => sale2.State
+                , stateMutator: (sale3, newState) => sale3.State = newState);
+
+            var result1 = default(double);
+            var result2 = default(double);
+            var testRequest1 = new TestRequest(123.45);
+            var testRequest2 = new TestRequest(12);
+
+            sut.ConfigureState(SaleState.Open)
+                .AddTransition<TestRequest>(SaleEvent.Pay, SaleState.ChangeDue, (saleInstance, request, token) =>
+                {
+                    result1 = request.Value;
+                    return Task.FromResult(true);
+                });
+
+            sut.ConfigureState(SaleState.ChangeDue)
+                .AddTransition<TestRequest>(SaleEvent.ChangeGiven, SaleState.Complete, (saleInstance, request, token) =>
+                {
+                    result2 = request.Value;
+                    return Task.FromResult(true);
+                });
+            var sale = new Sale(saleID: 45) { State = SaleState.Open };
+            await sut.FireTriggerAsync<TestRequest>(sale, SaleEvent.Pay, testRequest1);
+            var stateTransitionResult = await sut.FireTriggerAsync<TestRequest>(sale, SaleEvent.ChangeGiven, testRequest2);
+
+            Assert.NotNull(stateTransitionResult);
+            Assert.Equal(SaleState.Complete, stateTransitionResult.CurrentState);
+            Assert.Equal(SaleState.Complete, sale.State);
+            Assert.Equal(result1, testRequest1.Value);
+            Assert.Equal(result2, testRequest2.Value);
+        }
     }
 }

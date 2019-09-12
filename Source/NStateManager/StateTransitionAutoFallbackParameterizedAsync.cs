@@ -33,11 +33,11 @@ namespace NStateManager
         public override async Task<StateTransitionResult<TState, TTrigger>> ExecuteAsync(ExecutionParameters<T, TTrigger> parameters
           , StateTransitionResult<TState, TTrigger> currentResult = null)
         {
-            if (currentResult != null
-                && !parameters.CancellationToken.IsCancellationRequested
+            if (currentResult == null
+                || !parameters.CancellationToken.IsCancellationRequested
                 && _startState.IsEqual(currentResult.PreviousState)
                 && (_triggerState.IsEqual(currentResult.CurrentState)
-                 || _stateMachine.IsInState(parameters.Context, _triggerState)))
+                || _stateMachine.IsInState(parameters.Context, _triggerState)))
             { return await base.ExecuteAsync(parameters, currentResult); }
 
             return GetFreshResult(parameters
